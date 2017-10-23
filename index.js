@@ -1,65 +1,87 @@
 'use strict';
 
-var isObject = require('isobject');
-
-module.exports = function(file, fn) {
-  if (file == null) {
-    throw new TypeError('expected file to be a string, buffer, or object');
-  }
-  if (!isObject(file)) {
-    file = { content: file.toString() };
+module.exports = function(input, fn) {
+  var file = { content: input, sections: [] };
+  if (input && typeof input === 'object') {
+    file = input;
+    file.sections = file.sections || [];
   }
 
-  var orig = file.content;
-  file.sections = [];
-  file.text = [];
+  if (typeof fn !== 'function') {
+    fn = identity;
+  }
 
-  function parseSections(file) {
-    var m = /(?=^)(---)(([\w]+?)(?:[ \t]*\r?\n))/m.exec(file.content);
-    var idx = m ? m.index : -1;
+  var lines = input.split(/\r?\n/);
+  var obj = { key: '', data: {}, content: '' };
+  var sections = false;
+  var section = clone(obj);
+  var content = [];
+  var stack = [];
+  var data = [];
 
-    if (idx === -1 || (idx !== 0 && file.content[idx - 1] !== '\n')) {
-      return file;
+  function closeSection() {
+    if (stack.length) {
+      section.key = stack[0].slice(3).trim();
+      section.content = content.join('\n');
+      file.sections.push(section);
+      section = clone(obj);
+      content = [];
+      stack = [];
     }
+  }
 
-    var key = m[3];
-    var len = m[0].length;
-    var rest = file.content.slice(idx + len);
-    var content = file.content.slice(0, idx);
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    var len = stack.length;
+    var ln = line.trim();
 
-    if (file.sections.length === 0) {
-      file.text.push(content);
-    } else {
-      file.section.content = content;
-      if (typeof fn === 'function') {
-        fn(file.section, file);
+    if (isDelimiter(ln)) {
+      if (ln.length === 3) {
+        if (len === 0 || len === 2) {
+          content.push(line);
+          continue;
+        }
+        stack.push(ln);
+        section.data = fn(content.join('\n'));
+        content = [];
+        continue;
       }
+
+      if (sections === false) {
+        sections = true;
+        file.content = content.join('\n');
+        content = [];
+      }
+
+      if (len === 2) {
+        closeSection();
+      }
+
+      stack.push(ln);
+      continue;
     }
 
-    var end = rest.indexOf('\n---');
-    if (end === -1) {
-      return file;
-    }
-
-    file.section = { key: key, data: rest.slice(0, end) };
-    file.sections.push(file.section);
-    file.content = rest.slice(file.section.data.length + 4);
-    return parseSections(file);
+    content.push(line);
   }
 
-  parseSections(file);
-
-  if (file.sections.length === 0) {
-    file.content = orig;
-  } else {
-    file.section.content = file.content;
-    if (typeof fn === 'function') {
-      fn(file.section, file);
-    }
-    file.content = file.text.join('\n');
-  }
-
-  delete file.section;
-  delete file.text;
+  closeSection();
   return file;
 };
+
+function isDelimiter(line) {
+  if (line.slice(0, 3) !== '---') {
+    return false;
+  }
+  if (line.charAt(4) === '-') {
+    return false;
+  }
+  return true;
+}
+
+function clone(obj) {
+  return Object.assign({}, obj);
+}
+
+function identity(val) {
+  return val;
+}
