@@ -1,7 +1,7 @@
 {
   "name": "section-matter",
   "description": "Like front-matter, but supports multiple sections in a document.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "homepage": "https://github.com/jonschlinkert/section-matter",
   "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
   "repository": "jonschlinkert/section-matter",
