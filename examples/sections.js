@@ -1,8 +1,10 @@
 
 var sections = require('..');
-var str = `
+var str = `---yaml
+title: Don't parse me
+---
 
-# This page has JSON front matter!
+This page has front matter that shouldn't be parsed.
 
 ---foo
 title: one
