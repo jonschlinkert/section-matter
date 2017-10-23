@@ -2,7 +2,7 @@
 
 var isObject = require('isobject');
 
-module.exports = function(file, options) {
+module.exports = function(file, fn) {
   if (file == null) {
     throw new TypeError('expected file to be a string, buffer, or object');
   }
@@ -14,7 +14,7 @@ module.exports = function(file, options) {
   file.sections = [];
   file.text = [];
 
-  function parseSections(file, options) {
+  function parseSections(file) {
     var m = /(?=^)(---)(([\w]+?)(?:[ \t]*\r?\n))/m.exec(file.content);
     var idx = m ? m.index : -1;
 
@@ -31,8 +31,8 @@ module.exports = function(file, options) {
       file.text.push(content);
     } else {
       file.section.content = content;
-      if (options && typeof options.sections === 'function') {
-        options.sections(file.section, file);
+      if (typeof fn === 'function') {
+        fn(file.section, file);
       }
     }
 
@@ -41,21 +41,20 @@ module.exports = function(file, options) {
       return file;
     }
 
-    var data = rest.slice(0, end);
-    file.section = { key: key, data: data };
+    file.section = { key: key, data: rest.slice(0, end) };
     file.sections.push(file.section);
-    file.content = rest.slice(data.length + 4);
-    return parseSections(file, options);
+    file.content = rest.slice(file.section.data.length + 4);
+    return parseSections(file);
   }
 
-  parseSections(file, options);
+  parseSections(file);
 
   if (file.sections.length === 0) {
     file.content = orig;
   } else {
     file.section.content = file.content;
-    if (options && typeof options.sections === 'function') {
-      options.sections(file.section, file);
+    if (typeof fn === 'function') {
+      fn(file.section, file);
     }
     file.content = file.text.join('\n');
   }
