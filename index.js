@@ -1,20 +1,18 @@
 'use strict';
 
-module.exports = function(input, fn) {
-  var file = { content: input, sections: [] };
-  if (input && typeof input === 'object') {
-    file = input;
-    file.sections = file.sections || [];
+var isObject = require('isobject');
+var extend = require('extend-shallow');
+
+module.exports = function(input, options) {
+  if (typeof options === 'function') {
+    options = { parse: options };
   }
 
-  if (typeof fn !== 'function') {
-    fn = identity;
-  }
-
-  var lines = input.split(/\r?\n/);
-  var obj = { key: '', data: {}, content: '' };
+  var opts = extend({section_separator: '---', parse: identity}, options);
+  var file =  toObject(input);
+  var lines = file.content.split(/\r?\n/);
   var sections = false;
-  var section = clone(obj);
+  var section = { key: '', data: {}, content: '' };
   var content = [];
   var stack = [];
   var data = [];
@@ -23,8 +21,9 @@ module.exports = function(input, fn) {
     if (stack.length) {
       section.key = stack[0].slice(3).trim();
       section.content = content.join('\n');
+      opts.parse(section, file);
       file.sections.push(section);
-      section = clone(obj);
+      section = { key: '', data: {}, content: '' }
       content = [];
       stack = [];
     }
@@ -35,14 +34,14 @@ module.exports = function(input, fn) {
     var len = stack.length;
     var ln = line.trim();
 
-    if (isDelimiter(ln)) {
+    if (isDelimiter(ln, opts.section_separator)) {
       if (ln.length === 3) {
         if (len === 0 || len === 2) {
           content.push(line);
           continue;
         }
         stack.push(ln);
-        section.data = fn(content.join('\n'));
+        section.data = content.join('\n');
         content = [];
         continue;
       }
@@ -68,11 +67,19 @@ module.exports = function(input, fn) {
   return file;
 };
 
-function isDelimiter(line) {
-  if (line.slice(0, 3) !== '---') {
+function toObject(input) {
+  if (!isObject(input)) {
+    return { content: input, sections: [] };
+  }
+  input.sections = [];
+  return input;
+}
+
+function isDelimiter(line, delim) {
+  if (line.slice(0, delim.length) !== delim) {
     return false;
   }
-  if (line.charAt(4) === '-') {
+  if (line.charAt(delim.length + 1) === delim.slice(-1)) {
     return false;
   }
   return true;
