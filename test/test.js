@@ -24,57 +24,107 @@ describe('section-matter', function() {
   });
 
   it('should return a file object', function() {
-    assert.deepEqual(sections(''), {content: '', sections: []});
-    assert.deepEqual(sections('foo'), {content: 'foo', sections: []});
+    assert.deepEqual(sections(''), { content: '', sections: [] });
+    assert.deepEqual(sections('foo'), { content: 'foo', sections: [] });
   });
 
-  it('should not try to parse non-sections', function() {
+  it('should correctly parse non-sections', function() {
     assert.deepEqual(sections('foo\n---\nbar'), {
       content: 'foo\n---\nbar',
       sections: []
     });
-    assert.deepEqual(sections('---\nfoo\n---\nbar'), {
-      content: '---\nfoo\n---\nbar',
-      sections: []
-    });
+
     assert.deepEqual(sections('foo\n---\nbar\n---'), {
       content: 'foo\n---\nbar\n---',
       sections: []
     });
   });
 
-  it('should not parse front-matter by default', function() {
-    var input = '---\ntitle: bar\n---\n\nfoo';
-    assert.deepEqual(sections(input), {content: input, sections: []});
+  it('should parse front-matter without language', function() {
+    assert.deepEqual(sections('---\ntitle: bar\n---\n\nfoo'), {
+      content: '',
+      sections: [{ key: '', data: 'title: bar', content: '\nfoo' }]
+    });
+
+    assert.deepEqual(sections('---\nfoo\n---\nbar'), {
+      content: '',
+      sections: [{ key: '', data: 'foo', content: 'bar' }]
+    });
   });
 
   it('should parse front-matter with language', function() {
     var input = '---json\n{"title": "bar"}\n---\n\nfoo';
+
     assert.deepEqual(sections(input), {
       content: '',
-      sections: [ { key: 'json', data: '{"title": "bar"}', content: '\nfoo' } ]
+      sections: [
+        {
+          key: 'json',
+          data: '{"title": "bar"}',
+          content: '\nfoo'
+        }
+      ]
     });
   });
 
   it('should parse a section', function() {
     var input = '---\ntitle: bar\n---\n\nfoo\n---one\ntitle: One\n---\nThis is one';
+
     assert.deepEqual(sections(input), {
-      content: '---\ntitle: bar\n---\n\nfoo',
-      sections: [ { key: 'one', data: 'title: One', content: 'This is one' } ]
+      content: '',
+      sections: [
+        {
+          key: '',
+          data: 'title: bar',
+          content: '\nfoo'
+        },
+        {
+          key: 'one',
+          data: 'title: One',
+          content: 'This is one'
+        }
+      ]
+    });
+  });
+
+  it('should use custom section_delimiter', function() {
+    var input = '~~~\ntitle: bar\n~~~\n\nfoo\n~~~one\ntitle: One\n~~~\nThis is one';
+
+    assert.deepEqual(sections(input, {section_delimiter: '~~~'}), {
+      content: '',
+      sections: [
+        {
+          key: '',
+          data: 'title: bar',
+          content: '\nfoo'
+        },
+        {
+          key: 'one',
+          data: 'title: One',
+          content: 'This is one'
+        }
+      ]
     });
   });
 
   it('should use a custom parser on sections', function() {
     var input = '---\ntitle: bar\n---\n\nfoo\n---one\ntitle: One\n---\nThis is one';
+
     function parse(section) {
       section.data = yaml.safeLoad(section.data);
     }
+
     assert.deepEqual(sections(input, parse), {
-      content: '---\ntitle: bar\n---\n\nfoo',
+      content: '',
       sections: [
         {
+          key: '',
+          data: { title: 'bar' },
+          content: '\nfoo'
+        },
+        {
           key: 'one',
-          data: {title: 'One'},
+          data: { title: 'One' },
           content: 'This is one'
         }
       ]
@@ -82,43 +132,37 @@ describe('section-matter', function() {
   });
 
   it('should parse multiple sections', function() {
-    var input = [
-      '---',
-      'title: bar',
-      '---',
-      '',
-      'foo',
-      '',
-      '---one',
-      'title: One',
-      '---',
-      'This is one',
-      '',
-      '---two',
-      'title: Two',
-      '---',
-      'This is two',
-      ''
-    ].join('\n');
-
+    var input = read('multiple.md');
     assert.deepEqual(sections(input), {
-      content: '---\ntitle: bar\n---\n\nfoo\n',
+      content: '',
       sections: [
-        { key: 'one', data: 'title: One', content: 'This is one\n' },
-        { key: 'two', data: 'title: Two', content: 'This is two\n' }
+        {
+          key: '',
+          data: 'title: bar',
+          content: '\nfoo\n'
+        },
+        {
+          key: 'one',
+          data: 'title: One',
+          content: 'This is one\n'
+        },
+        {
+          key: 'two',
+          data: 'title: Two',
+          content: 'This is two\n'
+        }
       ]
     });
   });
 
   it('should not parse non-sections', function() {
     var input = read('hr.md');
-    // console.log(sections(input))
     assert.deepEqual(sections(input), {
       content: '',
       sections: [
         {
           key: 'yaml',
-          data: 'title: I\'m front matter',
+          data: "title: I'm front matter",
           content: '\nThis page has front matter that should be parsed before the sections.\n'
         },
         {
